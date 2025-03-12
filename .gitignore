@@ -1,0 +1,18 @@
+# jupyter notebook
+.ipynb_checkpoints/
+
+# python cache
+__pycache__/
+
+# file system
+.DS_Store
+Thumbs.db
+
+# pytorch checkpoints (too big)
+DexiNed/checkpoints
+PiDiNet/pidinet-master/trained_models
+PiDiNet/pidinet-master/training_logs
+*.pth
+
+# data
+DexiNed/BIPEDv2
