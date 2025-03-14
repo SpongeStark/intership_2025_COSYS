@@ -1,7 +1,7 @@
 import numpy as np
 import cv2 as cv
 
-from ConversionFunctions import convert_angular_size_in_pixels, convert_pixels_in_angular_size, \
+from ..ConversionFunctions import convert_angular_size_in_pixels, convert_pixels_in_angular_size, \
     convert_frequency_cpd_in_pixel_period, convert_pixel_period_in_frequency_cpd, convert_minutes_to_pixels
 
 

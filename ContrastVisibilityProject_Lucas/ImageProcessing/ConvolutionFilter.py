@@ -1,6 +1,6 @@
 import numpy as np
-from ConversionFunctions import convert_angular_size_in_pixels
-from Visibility.SDoG import get_fitting_sigma
+from ..ConversionFunctions import convert_angular_size_in_pixels
+from ..Visibility.SDoG import get_fitting_sigma
 
 LAMBDA = 3
 

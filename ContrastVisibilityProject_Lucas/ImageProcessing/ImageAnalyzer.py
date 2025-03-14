@@ -1,9 +1,9 @@
 import numpy as np
 import cv2 as cv
 
-from ConversionFunctions import convert_pixels_in_angular_size
-from ImageProcessing.ConvolutionFilter import Filter
-from ImageProcessing.ImageGenerator import Image
+from ..ConversionFunctions import convert_pixels_in_angular_size
+from .ConvolutionFilter import Filter
+from .ImageGenerator import Image
 
 ZERO_CROSSING = 0
 GRADIENT = 1

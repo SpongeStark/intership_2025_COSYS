@@ -1,6 +1,6 @@
 import numpy as np
 
-from Parameters import SCREEN_SIZE_PXL, SCREEN_SIZE_CM
+from .Parameters import SCREEN_SIZE_PXL, SCREEN_SIZE_CM
 
 MINUTES = 60
 
