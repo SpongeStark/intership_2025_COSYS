@@ -81,7 +81,7 @@ class ImageAnalyzer:
         cropped_visibility_map = self.visibility_map[top:bottom, left:right]
         self.mean_visibility = np.mean(cropped_visibility_map[cropped_visibility_map > epsilon])
 
-    def generate_visibility_map(self, img:Image, method=GRADIENT):
+    def generate_visibility_map(self, img:Image, method=GRADIENT, edge_map=None):
         preprocessed_image = img.image_array / np.mean(img.mean_intensity)
         self.filtered_img = cv.filter2D(preprocessed_image, -1, self.filter.filter_array, borderType=cv.BORDER_REPLICATE)
 
@@ -89,7 +89,10 @@ class ImageAnalyzer:
         image_dy = cv.filter2D(preprocessed_image, -1, self.filter.filter_dy, borderType=cv.BORDER_REPLICATE) / self.pixel_size_degree
 
         self.derived_filtered_img = np.hypot(image_dx, image_dy)
-        self.get_edge_localisation(method, image_dx, image_dy)
+        if edge_map is not None:
+            self.edge_localisation = edge_map
+        else:
+            self.get_edge_localisation(method, image_dx, image_dy)
         self.visibility_map = np.where(self.edge_localisation == 1, self.derived_filtered_img, 0)
 
         self.compute_mean_visibility()
