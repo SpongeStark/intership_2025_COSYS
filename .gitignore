@@ -1,6 +1,9 @@
 # jupyter notebook
 .ipynb_checkpoints/
 
+# VS Code
+.vscode/
+
 # python cache
 __pycache__/
 
@@ -9,10 +12,10 @@ __pycache__/
 Thumbs.db
 
 # pytorch checkpoints (too big)
-DexiNed/checkpoints
-PiDiNet/pidinet-master/trained_models
-PiDiNet/pidinet-master/training_logs
+resource/DexiNed/checkpoints
+resource/PiDiNet/pidinet-master/trained_models
+resource/PiDiNet/pidinet-master/training_logs
 *.pth
 
 # data
-DexiNed/BIPEDv2
+resource/DexiNed/BIPEDv2

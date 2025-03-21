@@ -1,7 +1,13 @@
+import sys
+import os
+
+# 计算 `project_root/` 目录的路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import cv2 as cv
 
-from ..ConversionFunctions import convert_angular_size_in_pixels, convert_pixels_in_angular_size, \
+from ConversionFunctions import convert_angular_size_in_pixels, convert_pixels_in_angular_size, \
     convert_frequency_cpd_in_pixel_period, convert_pixel_period_in_frequency_cpd, convert_minutes_to_pixels
 
 
