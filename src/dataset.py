@@ -24,7 +24,7 @@ ANALYSER = ImageAnalyzer(
 
 
 class BIPEDv2(Dataset):
-    def __init__(self, ori_path, gt_path, analyer=ANALYSER):
+    def __init__(self, ori_path, gt_path, analyer=ANALYSER, return_map=True):
         self.ori_path = Path(ori_path)
         self.gt_path = Path(gt_path)
         self.indexes = list(set([x.stem for x in self.ori_path.iterdir() if not x.name.startswith(".")]) & set([x.stem for x in self.gt_path.iterdir() if not x.name.startswith(".")]))
@@ -35,26 +35,31 @@ class BIPEDv2(Dataset):
             transforms.ToTensor(),
             normalize])
         self.analyzer = analyer
+        self.return_map = return_map
 
     def __len__(self):
         return len(self.indexes)
     
-    def __getitem__(self, i):
-        x = Image.open(self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg")).convert('RGB')
-        y = Image.open(self.gt_path.joinpath(self.indexes[i]).with_suffix(".png"))# .convert('RGB')
-        y = np.asarray(y)
-        img = IamgeGenerator()
-        img.load_image(self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg"))
-        img.convert_into_linear_space()
-        self.analyzer.generate_visibility_map(img, edge_map=np.where(y > 250, 1, 0))
-
-        return self.transform(x), self.analyzer.visibility_map
+    def __getitem__(self, i, normalize=True):
+        # read x
+        x = np.asarray(Image.open(self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg")).convert('RGB')) / 255
+        x = self.transform(x).float() if normalize else torch.from_numpy(x).float()
+        y = np.asarray(Image.open(self.gt_path.joinpath(self.indexes[i]).with_suffix(".png"))) / 255
+        if self.return_map:
+            img = IamgeGenerator()
+            img.load_image(self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg"))
+            img.convert_into_linear_space()
+            self.analyzer.generate_visibility_map(img, edge_map=np.where( y > 250/255, 1, 0))
+            y = self.analyzer.visibility_map
+        return x, torch.from_numpy(y).float()
         
 
 if __name__=="__main__":
     image_path = "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/imgs/train/rgbr/real/"
     edge_path = "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/edge_maps/train/rgbr/real/"
-    ds = BIPEDv2(image_path, edge_path)
+    ds = BIPEDv2(image_path, edge_path, return_map=False)
     print(ds[0][0].shape)
     print(ds[0][1].shape)
     print(ds[0][1].max())
+    print(ds[0][0].dtype)
+    print(ds[0][1].dtype)
