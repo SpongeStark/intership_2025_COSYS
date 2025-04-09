@@ -22,7 +22,7 @@ from dataset import BIPEDv2, transforms
 
 # %%
 device = "cuda" if torch.cuda.is_available() else "cpu"
-epoch = 100
+epoch = 200
 batch_size = 8
 learning_rate = 1e-4
 biped_dataset = BIPEDv2(
@@ -55,11 +55,16 @@ print(device)
 # %%
 import os
 # set checkpoint file name
-file_stem = "cpt_visibility_03"
-description = "with validation loss, and replace the sum of loss of each layers to the average"
+file_stem = "cpt_visibility_04"
+logging['metadata'] = {
+    "description": "More crazy!!! 200 epoch", 
+    "num_epoch":epoch, 
+    "batch_size":batch_size, 
+    "criterion": criterion.__class__.__name__, 
+    "learning_rate": learning_rate
+}
 
 if not os.path.isfile(f"./checkpoints/{file_stem}.json"): # First train
-    logging['metadata'] = {"description": description, "num_epoch":epoch, "batch_size":batch_size, "criterion": "MSE", "learning_rate": learning_rate}
     model = model.to(device)
     for e in range(epoch):
         # train step
@@ -105,4 +110,4 @@ else: # already trained
     for e, (train_loss, val_loss) in enumerate(zip(logging['train_loss'], logging['val_loss'])):
         print("-".join(["-"]*30))
         print(f"\nIn epoch {e}, the average  training  loss is {train_loss}")
-        print(f"\nIn epoch {e}, the average validation loss is {train_loss}")
+        print(f"\nIn epoch {e}, the average validation loss is {val_loss}")

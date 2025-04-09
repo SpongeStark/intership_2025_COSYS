@@ -40,26 +40,28 @@ class BIPEDv2(Dataset):
     def __len__(self):
         return len(self.indexes)
     
-    def __getitem__(self, i, normalize=True):
+    def __getitem__(self, i, transform=True):
         # read x
-        x = np.asarray(Image.open(self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg")).convert('RGB')) / 255
-        x = self.transform(x).float() if normalize else torch.from_numpy(x).float()
-        y = np.asarray(Image.open(self.gt_path.joinpath(self.indexes[i]).with_suffix(".png"))) / 255
+        x = Image.open(self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg")).convert('RGB')
+        x = self.transform(x) if transform else x
+        y = transforms.ToTensor()(Image.open(self.gt_path.joinpath(self.indexes[i]).with_suffix(".png")).convert("L")).squeeze()
         if self.return_map:
             img = IamgeGenerator()
             img.load_image(self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg"))
             img.convert_into_linear_space()
             self.analyzer.generate_visibility_map(img, edge_map=np.where( y > 250/255, 1, 0))
-            y = self.analyzer.visibility_map
-        return x, torch.from_numpy(y).float()
+            y = torch.from_numpy(self.analyzer.visibility_map).float()
+        return x, y
         
 
 if __name__=="__main__":
     image_path = "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/imgs/train/rgbr/real/"
     edge_path = "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/edge_maps/train/rgbr/real/"
-    ds = BIPEDv2(image_path, edge_path, return_map=False)
+    ds = BIPEDv2(image_path, edge_path, return_map=True)
     print(ds[0][0].shape)
+    print(ds.__getitem__(0, False)[0].size)
+    print(ds.__getitem__(0, False)[0].mode)
     print(ds[0][1].shape)
-    print(ds[0][1].max())
+    print(ds[0][1].max().item())
     print(ds[0][0].dtype)
     print(ds[0][1].dtype)
