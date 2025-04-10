@@ -1,0 +1,13 @@
+name: uge
+dependencies:
+  - pytorch::pytorch
+  - pytorch::torchvision
+  - pytorch::torchaudio
+  - nvidia::pytorch-cuda=11.8 # nvcc -V !!!
+  - conda-forge::kornia
+  - conda-forge::matplotlib
+  - conda-forge::numpy
+  - conda-forge::opencv
+  - anaconda::pillow
+  - anaconda::jupyter
+  - conda-forge::nbclassic
