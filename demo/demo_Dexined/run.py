@@ -1,14 +1,10 @@
-# %% [markdown]
-# # Load packages
-
-# %%
 import torch
 import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
 import json
 import numpy as np
 
-# %%
+
 import sys
 
 sys.path.append("../../resource/DexiNed")
@@ -17,10 +13,7 @@ sys.path.append("../../src")
 from model import DexiNed
 from dataset import BIPEDv2, transforms
 
-# %% [markdown]
-# # Prepare
 
-# %%
 device = "cuda" if torch.cuda.is_available() else "cpu"
 epoch = 200
 batch_size = 8
