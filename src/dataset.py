@@ -52,6 +52,20 @@ class BIPEDv2(Dataset):
             self.analyzer.generate_visibility_map(img, edge_map=np.where( y > 250/255, 1, 0))
             y = torch.from_numpy(self.analyzer.visibility_map).float()
         return x, y
+
+def get_visibility(image, edge):
+    pass
+
+
+def prepare_batch(batch, transform):
+    x, y = batch
+    return {
+        "images": x,
+        "inputs": transform(x),
+        "edges": y,
+        "visibilities": 1
+    }
+
         
 
 if __name__=="__main__":
