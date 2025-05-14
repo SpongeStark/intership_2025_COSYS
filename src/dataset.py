@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from torch.utils.data.dataset import Dataset
+from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
 from PIL import Image
 import torchvision.transforms as transforms
@@ -40,42 +40,43 @@ class BIPEDv2(Dataset):
     def __len__(self):
         return len(self.indexes)
     
-    def __getitem__(self, i, transform=True):
+    def __getitem__(self, i):
         # read x
-        x = Image.open(self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg")).convert('RGB')
-        x = self.transform(x) if transform else x
-        y = transforms.ToTensor()(Image.open(self.gt_path.joinpath(self.indexes[i]).with_suffix(".png")).convert("L")).squeeze()
-        if self.return_map:
-            img = IamgeGenerator()
-            img.load_image(self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg"))
-            img.convert_into_linear_space()
-            self.analyzer.generate_visibility_map(img, edge_map=np.where( y > 250/255, 1, 0))
-            y = torch.from_numpy(self.analyzer.visibility_map).float()
-        return x, y
+        image_path = self.ori_path.joinpath(self.indexes[i]).with_suffix(".jpg")
+        edge_path = self.gt_path.joinpath(self.indexes[i]).with_suffix(".png")
+        image_tensor = self.transform(Image.open(image_path).convert('RGB'))
+        edge_tensor = transforms.ToTensor()(Image.open(edge_path).convert("L")).squeeze()
+        # x = Image.open(image_path).convert('RGB')
+        # x = self.transform(x) if transform else x
+        # y = transforms.ToTensor()(Image.open(edge_path).convert("L")).squeeze()
+        # if self.return_map:
+        img = IamgeGenerator()
+        img.load_image(image_path)
+        img.convert_into_linear_space()
+        self.analyzer.generate_visibility_map(img, edge_map=np.where( edge_tensor > 250/255, 1, 0))
+        visibility_map = torch.from_numpy(self.analyzer.visibility_map).float()
 
-def get_visibility(image, edge):
-    pass
+        return {
+            "image_path": str(image_path.resolve()),
+            "edge_path": str(edge_path.resolve()),
+            "image_tensor": image_tensor, # shape [c, height, width]
+            "edge_tensor": edge_tensor, # shape [height, width]
+            "visibility_map": visibility_map
+        }
 
-
-def prepare_batch(batch, transform):
-    x, y = batch
-    return {
-        "images": x,
-        "inputs": transform(x),
-        "edges": y,
-        "visibilities": 1
-    }
-
-        
 
 if __name__=="__main__":
     image_path = "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/imgs/train/rgbr/real/"
     edge_path = "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/edge_maps/train/rgbr/real/"
     ds = BIPEDv2(image_path, edge_path, return_map=True)
-    print(ds[0][0].shape)
-    print(ds.__getitem__(0, False)[0].size)
-    print(ds.__getitem__(0, False)[0].mode)
-    print(ds[0][1].shape)
-    print(ds[0][1].max().item())
-    print(ds[0][0].dtype)
-    print(ds[0][1].dtype)
+    print(ds[0]['image_path'])
+    print(ds[0]['image_tensor'].dtype)
+    print(ds[0]['image_tensor'].shape)
+    print(ds[0]['edge_tensor'].dtype)
+    print(ds[0]['edge_tensor'].shape)
+    print(ds[0]['edge_tensor'].max().item())
+    print(ds[0]['visibility_map'].dtype)
+    print(ds[0]['visibility_map'].shape)
+
+    loader = DataLoader(ds, batch_size=8, shuffle=True)
+    print(next(iter(loader))['image_tensor'].shape)

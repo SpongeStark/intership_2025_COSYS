@@ -1,9 +1,10 @@
 import sys
 import os
 
-# 计算 `project_root/` 目录的路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+sys.path.append(
+    # 计算 `project_root/` 目录的路径
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 
 import numpy as np
 from ConversionFunctions import convert_angular_size_in_pixels

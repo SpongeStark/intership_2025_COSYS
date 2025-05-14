@@ -11,7 +11,7 @@ sys.path.append("../../resource/DexiNed")
 sys.path.append("../../src")
 
 from model import DexiNed
-from dataset import BIPEDv2, transforms
+from dataset import BIPEDv2
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -31,7 +31,7 @@ test_dataset = BIPEDv2(
 model = DexiNed()
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-loader = DataLoader(biped_dataset, batch_size=4)
+loader = DataLoader(biped_dataset, batch_size=4, shuffle=True)
 val_loader = DataLoader(test_dataset, batch_size=4)
 logging = {
     'metadata': {},
@@ -42,8 +42,6 @@ logging = {
 
 print(device)
 
-# %% [markdown]
-# # Train
 
 # %%
 import os
