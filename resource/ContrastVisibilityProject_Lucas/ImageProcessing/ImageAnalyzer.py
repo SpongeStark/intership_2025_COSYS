@@ -95,10 +95,10 @@ class ImageAnalyzer:
         image_dy = cv.filter2D(preprocessed_image, -1, self.filter.filter_dy, borderType=cv.BORDER_REPLICATE) / self.pixel_size_degree
 
         self.derived_filtered_img = np.hypot(image_dx, image_dy)
-        if edge_map is not None:
-            self.edge_localisation = edge_map
-        else:
-            self.get_edge_localisation(method, image_dx, image_dy)
+        # if edge_map is not None:
+        #     self.edge_localisation = edge_map
+        # else:
+        self.get_edge_localisation(method, image_dx, image_dy)
         self.visibility_map = np.where(self.edge_localisation == 1, self.derived_filtered_img, 0)
 
         self.compute_mean_visibility()

@@ -22,6 +22,15 @@ ANALYSER = ImageAnalyzer(
     Filter(distance_from_screen=50, sigma_list=SIGMA_LIST, weight_list=WEIGHT_LIST) # sDoG filter
 )
 
+TRANSFORM = transforms.Compose([
+    transforms.Resize((720, 1280)),
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225] # statistic from ImageNet
+    )
+])
+
 
 class BIPEDv2(Dataset):
     def __init__(self, ori_path, gt_path, analyer=ANALYSER, return_map=True):
