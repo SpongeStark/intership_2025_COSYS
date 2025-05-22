@@ -11,3 +11,8 @@ dependencies:
   - anaconda::pillow
   - anaconda::jupyter
   - conda-forge::nbclassic
+  - conda-forge::tqdm
+  - conda-forge::scikit-learn
+  # hugging face
+  - conda-forge::transformers
+  - conda-forge::datasets
