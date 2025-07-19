@@ -10,7 +10,7 @@ import os
 # 计算 `project_root/` 目录的路径
 project_root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # ../
 # 添加lucas的项目
-sys.path.append(os.path.join(project_root_path, "resource/ContrastVisibilityProject_Lucas"))
+sys.path.append(os.path.join(project_root_path, "resource/Lucas.old"))
 
 from ImageProcessing.ImageAnalyzer import ImageAnalyzer
 from ImageProcessing.ImageGenerator import Image as IamgeGenerator
@@ -33,7 +33,7 @@ TRANSFORM = transforms.Compose([
 
 
 class BIPEDv2(Dataset):
-    def __init__(self, ori_path, gt_path, analyer=ANALYSER, return_map=True):
+    def __init__(self, ori_path, gt_path, analyer=ANALYSER, return_map=True, cache_dir=None):
         self.ori_path = Path(ori_path)
         self.gt_path = Path(gt_path)
         self.indexes = list(set([x.stem for x in self.ori_path.iterdir() if not x.name.startswith(".")]) & set([x.stem for x in self.gt_path.iterdir() if not x.name.startswith(".")]))
@@ -45,6 +45,7 @@ class BIPEDv2(Dataset):
             normalize])
         self.analyzer = analyer
         self.return_map = return_map
+        self.cache_dir = cache_dir
 
     def __len__(self):
         return len(self.indexes)
@@ -55,10 +56,7 @@ class BIPEDv2(Dataset):
         edge_path = self.gt_path.joinpath(self.indexes[i]).with_suffix(".png")
         image_tensor = self.transform(Image.open(image_path).convert('RGB'))
         edge_tensor = transforms.ToTensor()(Image.open(edge_path).convert("L")).squeeze()
-        # x = Image.open(image_path).convert('RGB')
-        # x = self.transform(x) if transform else x
-        # y = transforms.ToTensor()(Image.open(edge_path).convert("L")).squeeze()
-        # if self.return_map:
+        
         img = IamgeGenerator()
         img.load_image(image_path)
         img.convert_into_linear_space()
