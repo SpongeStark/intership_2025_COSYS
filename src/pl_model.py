@@ -1,8 +1,14 @@
-import json
+"""
+File: pl_model.py
+Author: YANG Kai
+Date: 2025-07-01
+Description: A pytorch lightning model and its training function using pl.trainer
+"""
+
 from pathlib import Path
-import sys
-sys.path.append("/home/yangk/intership_2025_COSYS/resource/DexiNed")
-from model import DexiNed
+project_root = Path("/disk/hd/cosys/intership_2025_COSYS")
+
+import json
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, Subset
@@ -10,8 +16,13 @@ import lightning as pl
 from lightning.pytorch.loggers import CSVLogger
 from dataset import BIPEDv2
 import numpy as np
-from skimage.morphology import thin
+# from skimage.morphology import thin
 
+import sys
+model_path = str(project_root / "resource/DexiNed")
+if str(model_path) not in sys.path:
+    sys.path.append(str(model_path))
+from model import DexiNed
 
 # 用LightningModule包装模型和训练流程
 class LitModel(pl.LightningModule):
@@ -28,7 +39,7 @@ class LitModel(pl.LightningModule):
 
     def forward(self, x):
         outputs = self.model(x)
-        return [thin(edge_tensor>0.9) for edge_tensor in outputs]
+        return outputs # [thin(edge_tensor>0.9) for edge_tensor in outputs]
     
     def get_loss(self, outputs, y):
         return sum([self.criterion(output.squeeze(), y) for output in outputs]) / len(outputs)
@@ -70,15 +81,15 @@ class LitModel(pl.LightningModule):
 def main(description, save_dir, epoch=1, batch_size=4, n_work=53, learning_rate=1e-5):
     # 创建数据集和dataloader（示例数据）
     biped_dataset = BIPEDv2(
-        "/home/yangk/intership_2025_COSYS/data/BIPEDv2/BIPED/edges/imgs/train/rgbr/real/",
-        "/home/yangk/intership_2025_COSYS/data/BIPEDv2/BIPED/edges/edge_maps/train/rgbr/real/"
+        project_root / "data/BIPEDv2/BIPED/edges/imgs/train/rgbr/real/",
+        project_root / "data/BIPEDv2/BIPED/edges/edge_maps/train/rgbr/real/"
     )
     # biped_dataset = Subset(biped_dataset, list(range(16)))
     train_loader = DataLoader(biped_dataset, batch_size=batch_size, num_workers=n_work)
     # test set | 测试集
     test_dataset = BIPEDv2(
-        "/home/yangk/intership_2025_COSYS/data/BIPEDv2/BIPED/edges/imgs/test/rgbr/",
-        "/home/yangk/intership_2025_COSYS/data/BIPEDv2/BIPED/edges/edge_maps/test/rgbr/"
+        project_root / "data/BIPEDv2/BIPED/edges/imgs/test/rgbr/",
+        project_root / "data/BIPEDv2/BIPED/edges/edge_maps/test/rgbr/"
     )
     # test_dataset = Subset(test_dataset, list(range(8)))
     val_loader = DataLoader(test_dataset, batch_size=batch_size, num_workers=n_work)
@@ -105,7 +116,9 @@ def main(description, save_dir, epoch=1, batch_size=4, n_work=53, learning_rate=
         "num_epoch": epoch, 
         "batch_size": batch_size,
         # "criterion": criterion.__class__.__name__, 
-        "learning_rate": learning_rate
+        "learning_rate": learning_rate,
+        "train_losses":  model.train_losses,
+        "val_losses":  model.val_losses
     }
 
     with open(save_dir / "log_metadata.json", "w") as f:
@@ -113,8 +126,8 @@ def main(description, save_dir, epoch=1, batch_size=4, n_work=53, learning_rate=
     print(f"Succeed saving log in {save_dir}/log_metadata.json")
 
 if __name__ == "__main__":
-    save_dir = Path("/home/yangk/intership_2025_COSYS/data/checkpoints")
-    save_dir = save_dir / "point06"
+    save_dir = project_root / "data/checkpoints"
+    save_dir = save_dir / "pl_point06"
     save_dir.mkdir(parents=True, exist_ok=False)
     main("Change loss to the mean absolute error", save_dir, epoch=100)
     # save_dir = Path("/home/yangk/intership_2025_COSYS/src/checkpoints")

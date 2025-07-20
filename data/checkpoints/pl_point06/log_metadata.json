@@ -1,0 +1,1 @@
+{"description": "Change loss to the mean absolute error", "num_epoch": 100, "batch_size": 4, "learning_rate": 1e-05}

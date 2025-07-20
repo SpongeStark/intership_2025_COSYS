@@ -1,3 +1,10 @@
+"""
+File: train.py
+Author: YANG Kai
+Date: 2025-03-01 (反正很早，可能是最初的版本)
+Description: 训练Dexined, with args build in.
+"""
+
 import argparse
 import json
 from model import DexiNed

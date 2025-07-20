@@ -129,6 +129,108 @@ def get_nms_edge_batch(images: torch.Tensor) -> torch.Tensor:
     return nms_result.squeeze(1)  # 返回 (N, H, W)
 
 
+
+def nms_fully_vectorized(norm, pente_x, pente_y):
+    """
+    Fully vectorized NMS with directional interpolation for (N, H, W) inputs.
+    Returns a tensor of the same shape as norm.
+    """
+
+    if norm.dim() == 2:
+        norm = norm.unsqueeze(0)
+        pente_x = pente_x.unsqueeze(0)
+        pente_y = pente_y.unsqueeze(0)
+        squeeze_out = True
+    else:
+        squeeze_out = False
+
+    N, H, W = norm.shape
+    device = norm.device
+
+    eps = 1e-10
+    gy_safe = pente_y.clone()
+    gy_safe[gy_safe == 0] = eps
+    wd = pente_x / gy_safe  # (N, H, W)
+
+    a = torch.zeros_like(norm)
+    b = torch.zeros_like(norm)
+
+    # -------- Shifted versions of norm (8 directions) --------
+    def shift(x, dy, dx):
+        # shift x by (dy, dx), pad with 0
+        return F.pad(x, (1, 1, 1, 1), mode='constant')[..., 1+dy:H+1+dy, 1+dx:W+1+dx]
+
+    n  = norm
+    n_up       = shift(n, -1,  0)
+    n_down     = shift(n,  1,  0)
+    n_left     = shift(n,  0, -1)
+    n_right    = shift(n,  0,  1)
+    n_upleft   = shift(n, -1, -1)
+    n_upright  = shift(n, -1,  1)
+    n_downleft = shift(n,  1, -1)
+    n_downright= shift(n,  1,  1)
+
+    # ---------- Build masks ----------
+    mask1 = wd >= 1
+    mask2 = (wd >= 0) & (wd < 1)
+    mask3 = (wd >= -1) & (wd < 0)
+    mask4 = wd < -1
+    gy_neg = pente_y < 0
+
+    # ---- mask1: wd >= 1 (↘ ↖)，取 (i,j+1)->(i+1,j+1) and (i,j-1)->(i-1,j-1)
+    wd1 = torch.zeros_like(wd)
+    wd1[mask1] = 1 / wd[mask1]
+
+    a1 = n_right + (n_downright - n_right) * wd1
+    b1 = n_left + (n_upleft - n_left) * wd1
+
+    # ---- mask2: 0 <= wd < 1 (→↘ ←↖)
+    a2 = n_down + (n_downright - n_down) * wd
+    b2 = n_up + (n_upleft - n_up) * wd
+
+    # ---- mask3: -1 <= wd < 0 (→↙ ←↗)
+    a3 = n_down + (n_downleft - n_down) * wd
+    b3 = n_up + (n_upright - n_up) * wd
+
+    # ---- mask4: wd < -1 (↙ ↗)
+    wd4 = torch.zeros_like(wd)
+    wd4[mask4] = 1 / wd[mask4]
+    a4 = n_left + (n_downleft - n_left) * wd4
+    b4 = n_right + (n_upright - n_right) * wd4
+
+    # ---- assemble a, b according to masks ----
+    a = torch.where(mask1, a1, a)
+    b = torch.where(mask1, b1, b)
+    a = torch.where(mask2, a2, a)
+    b = torch.where(mask2, b2, b)
+    a = torch.where(mask3, a3, a)
+    b = torch.where(mask3, b3, b)
+    a = torch.where(mask4, a4, a)
+    b = torch.where(mask4, b4, b)
+
+    # flip a, b if pente_y < 0
+    a_, b_ = a.clone(), b.clone()
+    a = torch.where(gy_neg, b_, a)
+    b = torch.where(gy_neg, a_, b)
+
+    # If both gradients are 0 → retain original
+    zero_grad = (pente_x == 0) & (pente_y == 0)
+
+    # Final suppression decision
+    keep = (norm >= a) & (norm > b)
+    keep = keep | zero_grad
+
+    out = torch.where(keep, norm, torch.zeros_like(norm))
+
+    # Set borders to 0
+    out[:, 0, :] = 0
+    out[:, -1, :] = 0
+    out[:, :, 0] = 0
+    out[:, :, -1] = 0
+
+    return out.squeeze(0) if squeeze_out else out
+
+
 if __name__=="__main__":
     img = torch.randn(720, 480)
     # 应用 NMS
