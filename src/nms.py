@@ -3,9 +3,6 @@ import torch.nn.functional as F
 import math
 import cv2
 import numpy as np
-
-import torch
-import torch.nn.functional as F
 import math
 
 
@@ -128,6 +125,66 @@ def get_nms_edge_batch(images: torch.Tensor) -> torch.Tensor:
 
     return nms_result.squeeze(1)  # 返回 (N, H, W)
 
+
+def get_gradient(image):
+    dim = image.dim()
+    if dim == 3:
+        image = image.unsqueeze(0)
+    if dim == 2:
+        image = image.unsqueeze(0).unsqueeze(0)
+    
+    # Compute gradients with Sobel filters
+    sobel_x = torch.tensor([[-1., 0., 1.],
+                             [-2., 0., 2.],
+                             [-1., 0., 1.]])
+    
+    sobel_y = torch.tensor([[-1., -2., -1.],
+                             [ 0.,  0.,  0.],
+                             [ 1.,  2.,  1.]])
+    
+    sobel_x = sobel_x.unsqueeze(0).unsqueeze(0)  # shape [1, 1, 3, 3]
+    sobel_y = sobel_y.unsqueeze(0).unsqueeze(0)
+
+    gx = F.conv2d(image, sobel_x, padding=1)
+    gy = F.conv2d(image, sobel_y, padding=1)
+
+    if dim == 3:
+        return gx.squeeze(0), gy.squeeze(0)
+    if dim == 2:
+        return gx.squeeze(0).squeeze(0), gy.squeeze(0).squeeze(0)
+    return gx, gy
+
+def gaussian_kernel(kernel_size: int, sigma: float) -> torch.Tensor:
+    """创建 2D 高斯核 (kernel_size x kernel_size)"""
+    ax = torch.arange(-kernel_size // 2 + 1., kernel_size // 2 + 1.)
+    xx, yy = torch.meshgrid(ax, ax, indexing='ij')
+    kernel = torch.exp(-(xx**2 + yy**2) / (2 * sigma**2))
+    kernel = kernel / kernel.sum()
+    return kernel
+
+def apply_gaussian_blur(img: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
+    """使用给定高斯核对图像进行卷积"""
+    C = img.shape[1]
+    kernel = kernel.expand(C, 1, *kernel.shape)  # 扩展为 (C, 1, k, k)
+    img_blur = F.conv2d(img, kernel, padding=kernel.shape[-1] // 2, groups=C)
+    return img_blur
+
+def get_gradient_canny(image):
+    dim = image.dim()
+    if dim == 3:
+        image = image.unsqueeze(0)
+    if dim == 2:
+        image = image.unsqueeze(0).unsqueeze(0)
+
+    kernel = gaussian_kernel(kernel_size=7, sigma=1.5)
+    img_blurred = apply_gaussian_blur(image, kernel)
+    gx, gy = get_gradient(img_blurred)
+
+    if dim == 3:
+        return gx.squeeze(0), gy.squeeze(0)
+    if dim == 2:
+        return gx.squeeze(0).squeeze(0), gy.squeeze(0).squeeze(0)
+    return gx, gy
 
 
 def nms_fully_vectorized(norm, pente_x, pente_y):

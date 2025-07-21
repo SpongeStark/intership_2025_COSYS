@@ -6,7 +6,8 @@ Description: A pytorch lightning model and its training function using pl.traine
 """
 
 from pathlib import Path
-project_root = Path("/disk/hd/cosys/intership_2025_COSYS")
+import os
+PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
 import torch
@@ -17,9 +18,10 @@ from lightning.pytorch.loggers import CSVLogger
 from dataset import BIPEDv2
 import numpy as np
 # from skimage.morphology import thin
+from nms import nms_fully_vectorized, get_gradient_canny
 
 import sys
-model_path = str(project_root / "resource/DexiNed")
+model_path = str(PROJECT_ROOT / "resource/DexiNed")
 if str(model_path) not in sys.path:
     sys.path.append(str(model_path))
 from model import DexiNed
@@ -39,6 +41,7 @@ class LitModel(pl.LightningModule):
 
     def forward(self, x):
         outputs = self.model(x)
+        outputs[-1] = nms_fully_vectorized(outputs[-1], *get_gradient_canny(outputs[-1]))
         return outputs # [thin(edge_tensor>0.9) for edge_tensor in outputs]
     
     def get_loss(self, outputs, y):
@@ -78,18 +81,18 @@ class LitModel(pl.LightningModule):
         self.validation_step_outputs = []  # free memory
 
 
-def main(description, save_dir, epoch=1, batch_size=4, n_work=53, learning_rate=1e-5):
+def training(description, save_dir, epoch=1, batch_size=4, n_work=53, learning_rate=1e-5):
     # 创建数据集和dataloader（示例数据）
     biped_dataset = BIPEDv2(
-        project_root / "data/BIPEDv2/BIPED/edges/imgs/train/rgbr/real/",
-        project_root / "data/BIPEDv2/BIPED/edges/edge_maps/train/rgbr/real/"
+        PROJECT_ROOT / "data/BIPEDv2/BIPED/edges/imgs/train/rgbr/real/",
+        PROJECT_ROOT / "data/BIPEDv2/BIPED/edges/edge_maps/train/rgbr/real/"
     )
     # biped_dataset = Subset(biped_dataset, list(range(16)))
     train_loader = DataLoader(biped_dataset, batch_size=batch_size, num_workers=n_work)
     # test set | 测试集
     test_dataset = BIPEDv2(
-        project_root / "data/BIPEDv2/BIPED/edges/imgs/test/rgbr/",
-        project_root / "data/BIPEDv2/BIPED/edges/edge_maps/test/rgbr/"
+        PROJECT_ROOT / "data/BIPEDv2/BIPED/edges/imgs/test/rgbr/",
+        PROJECT_ROOT / "data/BIPEDv2/BIPED/edges/edge_maps/test/rgbr/"
     )
     # test_dataset = Subset(test_dataset, list(range(8)))
     val_loader = DataLoader(test_dataset, batch_size=batch_size, num_workers=n_work)
@@ -125,10 +128,13 @@ def main(description, save_dir, epoch=1, batch_size=4, n_work=53, learning_rate=
         json.dump(log_metadata, f)
     print(f"Succeed saving log in {save_dir}/log_metadata.json")
 
-if __name__ == "__main__":
-    save_dir = project_root / "data/checkpoints"
-    save_dir = save_dir / "pl_point06"
+def main():
+    save_dir = PROJECT_ROOT / "data/checkpoints"
+    save_dir = save_dir / "pl_point07"
     save_dir.mkdir(parents=True, exist_ok=False)
-    main("Change loss to the mean absolute error", save_dir, epoch=100)
+    training("Add NMS at end, using edge for gradient, and edge itself as norm.", save_dir, epoch=100)
     # save_dir = Path("/home/yangk/intership_2025_COSYS/src/checkpoints")
     # model = LitModel.load_from_checkpoint(str(save_dir / "point05" / "model.ckpt"))
+
+if __name__ == "__main__":
+    main()
