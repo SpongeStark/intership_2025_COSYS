@@ -31,8 +31,8 @@ class LitModel(pl.LightningModule):
     def __init__(self, lr=1e-3):
         super().__init__()
         self.model = DexiNed()
-        # self.criterion = nn.MSELoss()
-        self.criterion = nn.L1Loss()
+        self.criterion = nn.MSELoss()
+        # self.criterion = nn.L1Loss()
         self.train_losses = []
         self.training_step_outputs = []
         self.val_losses = []
@@ -41,11 +41,11 @@ class LitModel(pl.LightningModule):
 
     def forward(self, x):
         outputs = self.model(x)
-        outputs[-1] = nms_fully_vectorized(outputs[-1], *get_gradient_canny(outputs[-1]))
+        # outputs[-1] = nms_fully_vectorized(outputs[-1].squeeze(1), *get_gradient_canny(outputs[-1])).unsqueeze(1)
         return outputs # [thin(edge_tensor>0.9) for edge_tensor in outputs]
     
     def get_loss(self, outputs, y):
-        return sum([self.criterion(output.squeeze(), y) for output in outputs]) / len(outputs)
+        return sum([self.criterion(output.squeeze(1), y) for output in outputs]) / len(outputs)
 
     def training_step(self, batch, batch_idx):
         x, y = batch['image_tensor'], batch['visibility_map']
@@ -130,9 +130,9 @@ def training(description, save_dir, epoch=1, batch_size=4, n_work=53, learning_r
 
 def main():
     save_dir = PROJECT_ROOT / "data/checkpoints"
-    save_dir = save_dir / "pl_point07"
+    save_dir = save_dir / "pl_point08"
     save_dir.mkdir(parents=True, exist_ok=False)
-    training("Add NMS at end, using edge for gradient, and edge itself as norm.", save_dir, epoch=100)
+    training("re-train for test", save_dir, epoch=100, batch_size=8)
     # save_dir = Path("/home/yangk/intership_2025_COSYS/src/checkpoints")
     # model = LitModel.load_from_checkpoint(str(save_dir / "point05" / "model.ckpt"))
 

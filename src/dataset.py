@@ -31,7 +31,6 @@ TRANSFORM = transforms.Compose([
     )
 ])
 
-
 class BIPEDv2(Dataset):
     def __init__(self, ori_path, gt_path, analyer=ANALYSER, return_map=True, cache_dir=None):
         self.ori_path = Path(ori_path)

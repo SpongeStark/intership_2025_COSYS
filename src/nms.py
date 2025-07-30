@@ -132,6 +132,8 @@ def get_gradient(image):
         image = image.unsqueeze(0)
     if dim == 2:
         image = image.unsqueeze(0).unsqueeze(0)
+    device = image.device
+    C = image.shape[1]
     
     # Compute gradients with Sobel filters
     sobel_x = torch.tensor([[-1., 0., 1.],
@@ -141,12 +143,12 @@ def get_gradient(image):
     sobel_y = torch.tensor([[-1., -2., -1.],
                              [ 0.,  0.,  0.],
                              [ 1.,  2.,  1.]])
-    
-    sobel_x = sobel_x.unsqueeze(0).unsqueeze(0)  # shape [1, 1, 3, 3]
-    sobel_y = sobel_y.unsqueeze(0).unsqueeze(0)
 
-    gx = F.conv2d(image, sobel_x, padding=1)
-    gy = F.conv2d(image, sobel_y, padding=1)
+    sobel_x = sobel_x.expand(C, 1, *sobel_x.shape)  # shape [C, 1, 3, 3]
+    sobel_y = sobel_y.expand(C, 1, *sobel_y.shape)  # shape [C, 1, 3, 3]
+
+    gx = F.conv2d(image, sobel_x.to(device), padding=1, groups=C)
+    gy = F.conv2d(image, sobel_y.to(device), padding=1, groups=C)
 
     if dim == 3:
         return gx.squeeze(0), gy.squeeze(0)
@@ -165,8 +167,9 @@ def gaussian_kernel(kernel_size: int, sigma: float) -> torch.Tensor:
 def apply_gaussian_blur(img: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
     """使用给定高斯核对图像进行卷积"""
     C = img.shape[1]
+    device = img.device
     kernel = kernel.expand(C, 1, *kernel.shape)  # 扩展为 (C, 1, k, k)
-    img_blur = F.conv2d(img, kernel, padding=kernel.shape[-1] // 2, groups=C)
+    img_blur = F.conv2d(img, kernel.to(device), padding=kernel.shape[-1] // 2, groups=C)
     return img_blur
 
 def get_gradient_canny(image):

@@ -1,52 +1,75 @@
 import os
+from pathlib import Path
+PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data.dataloader import DataLoader
 import json
 import numpy as np
 import sys
 
-sys.path.append("/home/yangk/intership_2025_COSYS/resource/DexiNed")
+import sys
+model_path = str(PROJECT_ROOT / "resource/DexiNed")
+if str(model_path) not in sys.path:
+    sys.path.append(str(model_path))
 from model import DexiNed
 
 from dataset import BIPEDv2, transforms
-from nms import get_nms_edge_batch
+from tools import weighted_mean_for_last_layer
+from nms import get_gradient_canny, nms_fully_vectorized
+from losses_dexined import * 
 
+from dataclasses import dataclass
 
-if __name__=="__main__":
+@dataclass
+class TrainingArgs:
+    output_dir: Path
+    criterion: WeightedMSELoss
+    epochs: int = 1
+    batch_size: int = 4
+    learning_rate: float = 1e-4
+    device: str = "cpu"
+
+def training(description, args:TrainingArgs):
+    output_dir = args.output_dir 
     # preapre data | 准备数据
+    batch_size = args.batch_size
     # train set | 训练集
     biped_dataset = BIPEDv2(
-        "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/imgs/train/rgbr/real/",
-        "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/edge_maps/train/rgbr/real/"
+        PROJECT_ROOT / "data/BIPEDv2/BIPED/edges/imgs/train/rgbr/real/",
+        PROJECT_ROOT / "data/BIPEDv2/BIPED/edges/edge_maps/train/rgbr/real/"
     )
-    train_loader = DataLoader(biped_dataset, batch_size=4)
+    train_loader = DataLoader(biped_dataset, batch_size=batch_size)
     # test set | 测试集
     test_dataset = BIPEDv2(
-        "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/imgs/test/rgbr/",
-        "/home/yangk/intership_2025_COSYS/resource/DexiNed/BIPEDv2/BIPED/edges/edge_maps/test/rgbr/"
+        PROJECT_ROOT / "data/BIPEDv2/BIPED/edges/imgs/test/rgbr/",
+        PROJECT_ROOT / "data/BIPEDv2/BIPED/edges/edge_maps/test/rgbr/"
     )
-    val_loader = DataLoader(test_dataset, batch_size=4)
+    val_loader = DataLoader(test_dataset, batch_size=batch_size)
     # set hyper-parameters | 设置超参数
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(device)
-    epoch = 100
-    batch_size = 8
-    learning_rate = 1e-4
+    device = args.device
+    epoch = args.epochs
+    learning_rate = args.learning_rate
     model = DexiNed() # load model 
-    criterion = nn.MSELoss()
+    criterion = args.criterion
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     logging = {'metadata': {}, 'train_loss': [], 'val_loss': []}
     file_stem = "cpt_visibility_04"
     logging['metadata'] = {
-        "description": "add non-max suppression", 
+        "description": description, 
         "num_epoch":epoch, 
-        "batch_size":batch_size, 
         "criterion": criterion.__class__.__name__, 
+        "batch_size":batch_size, 
         "learning_rate": learning_rate
     }
+    # prefix = PROJECT_ROOT / "data/checkpoints/torch_point05"
+    model_path = output_dir / "model.pth"
+    log_path = output_dir / "log.json"
     # train or load | 训练
-    if not os.path.isfile(f"./checkpoints/{file_stem}.json"): # First train
+    if not log_path.is_file(): # First train
+        output_dir.mkdir(parents=True, exist_ok=True)
         model = model.to(device)
         for e in range(epoch):
             # train step
@@ -56,7 +79,10 @@ if __name__=="__main__":
                 x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
                 optimizer.zero_grad()
                 outputs = model(x)
-                loss = sum([criterion(get_nms_edge_batch(output), y) for output in outputs]) / len(outputs)
+                # # NMS
+                # gx, gy = get_gradient_canny(x.mean(dim=1))
+                # outputs[-1] = nms_fully_vectorized(outputs[-1].squeeze(), gx, gy).unsqueeze(1)
+                loss = criterion(outputs, y) # sum([criterion(output, y) for output in outputs]) / len(outputs)
                 loss.backward()
                 optimizer.step()
                 print("*", end="", flush=True)
@@ -70,18 +96,20 @@ if __name__=="__main__":
                 for batch in val_loader:
                     x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
                     outputs = model(x)
-                    loss = sum([criterion(get_nms_edge_batch(output), y) for output in outputs]) / len(outputs)
+                    # # NMS
+                    # gx, gy = get_gradient_canny(x.mean(dim=1))
+                    # outputs[-1] = nms_fully_vectorized(outputs[-1].squeeze(), gx, gy).unsqueeze(1)
+                    loss = criterion(outputs, y) # sum([criterion(output, y) for output in outputs]) / len(outputs)
                     val_epoch_loss.append(loss.detach().item())
             logging['val_loss'].append(np.mean(val_epoch_loss))
             print(f"In epoch {e}, the average validation loss is {logging['val_loss'][-1]}")
         model = model.to('cpu')
         # save files
-        # file_stem = "cpt_visibility_01"
-        torch.save(model.state_dict(), f"./checkpoints/{file_stem}.pth")
-        print(f"Succeed saving mdoel parameters in ./checkpoints/{file_stem}.pth.")
-        with open(f"./checkpoints/{file_stem}.json", "w") as f:
+        torch.save(model.state_dict(), str(model_path))
+        print(f"Succeed saving mdoel parameters in {model_path}.")
+        with open(str(log_path), "w") as f:
             json.dump(logging, f)
-        print(f"Succeed saving log in ./checkpoints/{file_stem}.json")
+        print(f"Succeed saving log in {log_path}.")
     else: # already trained
         # load model
         model.load_state_dict(torch.load(f"./checkpoints/{file_stem}.pth", weights_only=True))
@@ -94,4 +122,47 @@ if __name__=="__main__":
             print(f"\nIn epoch {e}, the average  training  loss is {train_loss}")
             print(f"In epoch {e}, the average validation loss is {val_loss}")
 
+
+def main():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(device)
+    args = TrainingArgs(
+        epochs=1,
+        batch_size=8,
+        learning_rate=1e-4,
+        device=device,
+        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point09",
+        criterion=WeightedMSELoss()
+    )
+    training("test a restruction", args)
+
+def multi_train():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(device)
+    # base train with MSE for verifying
+    args = TrainingArgs(
+        epochs=50,
+        batch_size=8,
+        learning_rate=5e-5,
+        device=device,
+        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point09",
+        criterion=WeightedMSELoss()
+    )
+    training("re-train with MSE after restruction of loss classes", args)
+    # re-train with MAE
+    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point10"
+    args.criterion = WeightedMAELoss()
+    training("re-train with MAE after restruction of loss classes", args)
+    # re-train with dilatation
+    args.epochs = 100
+    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point11"
+    args.criterion = WeightedMSELossWithDilatation()
+    training("GT with dilatation", args)
+    # re-train with mean blur
+    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point12"
+    args.criterion = WeightedMSELossWithMeanBlur()
+    training("GT with mean blur", args)
+
+if __name__=="__main__":
+    multi_train()
 
