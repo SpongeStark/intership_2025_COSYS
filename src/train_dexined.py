@@ -76,7 +76,8 @@ def training(description, args:TrainingArgs):
             model.train()
             epoche_loss = []
             for batch in train_loader:
-                x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
+                x, y = batch['image_tensor'].to(device), batch['edge_tensor'].to(device)
+                # x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
                 optimizer.zero_grad()
                 outputs = model(x)
                 # # NMS
@@ -94,7 +95,8 @@ def training(description, args:TrainingArgs):
             val_epoch_loss = []
             with torch.no_grad():
                 for batch in val_loader:
-                    x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
+                    x, y = batch['image_tensor'].to(device), batch['edge_tensor'].to(device)
+                    # x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
                     outputs = model(x)
                     # # NMS
                     # gx, gy = get_gradient_canny(x.mean(dim=1))
@@ -127,14 +129,14 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(device)
     args = TrainingArgs(
-        epochs=1,
+        epochs=50,
         batch_size=8,
         learning_rate=1e-4,
         device=device,
-        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point09",
-        criterion=WeightedMSELoss()
+        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point03",
+        criterion=WeightedBCELoss()
     )
-    training("test a restruction", args)
+    training("train edge classification", args)
 
 def multi_train():
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -145,24 +147,15 @@ def multi_train():
         batch_size=8,
         learning_rate=5e-5,
         device=device,
-        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point09",
-        criterion=WeightedMSELoss()
+        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point01",
+        criterion=WeightedBCELoss()
     )
-    training("re-train with MSE after restruction of loss classes", args)
+    training("train with BECLoss classic", args)
     # re-train with MAE
-    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point10"
-    args.criterion = WeightedMAELoss()
-    training("re-train with MAE after restruction of loss classes", args)
-    # re-train with dilatation
-    args.epochs = 100
-    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point11"
-    args.criterion = WeightedMSELossWithDilatation()
-    training("GT with dilatation", args)
-    # re-train with mean blur
-    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point12"
-    args.criterion = WeightedMSELossWithMeanBlur()
-    training("GT with mean blur", args)
+    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point03"
+    args.criterion = WeightedMaskedBCELoss()
+    training("train with masked BECLoss like it in paper", args)
 
 if __name__=="__main__":
-    multi_train()
+    main()()
 
