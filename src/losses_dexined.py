@@ -94,6 +94,14 @@ class WeightedMSELossWithMeanBlur(WeightedMSELoss):
     def _loss_fn(self, prediction, target):
         y_blurred = self.mean_blur(target)
         return super()._loss_fn(prediction, y_blurred)
+
+class WeightedCombineLoss(WeightedLoss):
+    def __init__(self, weight=None, beta=0.51):
+        super().__init__(weight)
+        self.beta = beta
+
+    def _loss_fn(self, prediction, target):
+        return [torch.pow((pred-target)**2, self.beta).mean() for pred in prediction]
     
 def test(criterion, device='cpu'):
     from dataset import BIPEDv2
@@ -143,8 +151,8 @@ def test_bce(device):
 
 
 if __name__=="__main__":
-    criterion = WeightedBCELoss()
+    criterion = WeightedCombineLoss()
     print(f"Test {criterion.__class__.__name__}")
     # test(criterion)
-    # test(criterion, 'cuda' if torch.cuda.is_available() else "cpu")
-    test_bce("cpu")
+    test(criterion, 'cuda' if torch.cuda.is_available() else "cpu")
+    # test_bce("cpu")

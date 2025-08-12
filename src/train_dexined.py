@@ -18,8 +18,9 @@ from model import DexiNed
 
 from dataset import BIPEDv2, transforms
 from tools import weighted_mean_for_last_layer
-from nms import get_gradient_canny, nms_fully_vectorized
+from nms import get_gradient_canny, nms_fully_vectorized, get_gradient
 from losses_dexined import * 
+from early_stopping import EarlyStopping
 
 from dataclasses import dataclass
 
@@ -32,8 +33,9 @@ class TrainingArgs:
     learning_rate: float = 1e-4
     device: str = "cpu"
 
-def training(description, args:TrainingArgs):
+def training(description, args:TrainingArgs, use_nms=False):
     output_dir = args.output_dir 
+    early_stopping = EarlyStopping(save_dir=output_dir)
     # preapre data | 准备数据
     batch_size = args.batch_size
     # train set | 训练集
@@ -76,13 +78,14 @@ def training(description, args:TrainingArgs):
             model.train()
             epoche_loss = []
             for batch in train_loader:
-                x, y = batch['image_tensor'].to(device), batch['edge_tensor'].to(device)
-                # x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
+                # x, y = batch['image_tensor'].to(device), batch['edge_tensor'].to(device)
+                x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
                 optimizer.zero_grad()
                 outputs = model(x)
                 # # NMS
-                # gx, gy = get_gradient_canny(x.mean(dim=1))
-                # outputs[-1] = nms_fully_vectorized(outputs[-1].squeeze(), gx, gy).unsqueeze(1)
+                if use_nms:
+                    gx, gy = get_gradient(x.mean(dim=1))
+                    outputs[-1] = nms_fully_vectorized(outputs[-1].squeeze(), gx, gy).unsqueeze(1)
                 loss = criterion(outputs, y) # sum([criterion(output, y) for output in outputs]) / len(outputs)
                 loss.backward()
                 optimizer.step()
@@ -95,16 +98,23 @@ def training(description, args:TrainingArgs):
             val_epoch_loss = []
             with torch.no_grad():
                 for batch in val_loader:
-                    x, y = batch['image_tensor'].to(device), batch['edge_tensor'].to(device)
-                    # x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
+                    # x, y = batch['image_tensor'].to(device), batch['edge_tensor'].to(device)
+                    x, y = batch['image_tensor'].to(device), batch['visibility_map'].to(device)
                     outputs = model(x)
                     # # NMS
-                    # gx, gy = get_gradient_canny(x.mean(dim=1))
-                    # outputs[-1] = nms_fully_vectorized(outputs[-1].squeeze(), gx, gy).unsqueeze(1)
+                    if use_nms:
+                        gx, gy = get_gradient(x.mean(dim=1))
+                        outputs[-1] = nms_fully_vectorized(outputs[-1].squeeze(), gx, gy).unsqueeze(1)
                     loss = criterion(outputs, y) # sum([criterion(output, y) for output in outputs]) / len(outputs)
                     val_epoch_loss.append(loss.detach().item())
             logging['val_loss'].append(np.mean(val_epoch_loss))
             print(f"In epoch {e}, the average validation loss is {logging['val_loss'][-1]}")
+            # early stopping | 防止 overfitting
+            early_stopping(logging['val_loss'][-1], model.cpu())
+            if early_stopping.early_stop:
+                print("Stop training, early stop.")
+                break
+            model = model.to(device)
         model = model.to('cpu')
         # save files
         torch.save(model.state_dict(), str(model_path))
@@ -129,33 +139,35 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(device)
     args = TrainingArgs(
-        epochs=50,
+        epochs=100,
         batch_size=8,
-        learning_rate=1e-4,
+        learning_rate=1e-5,
         device=device,
-        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point03",
-        criterion=WeightedBCELoss()
+        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point08_bis",
+        criterion=WeightedMSELoss()
     )
-    training("train edge classification", args)
+    training("train with NMS, Sobel for Gx and Gy", args)
 
 def multi_train():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(device)
-    # base train with MSE for verifying
     args = TrainingArgs(
-        epochs=50,
+        epochs=100,
         batch_size=8,
-        learning_rate=5e-5,
+        learning_rate=1e-5,
         device=device,
-        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point01",
-        criterion=WeightedBCELoss()
+        output_dir=PROJECT_ROOT/"data/checkpoints/torch_point00",
+        criterion=WeightedMSELoss()
     )
-    training("train with BECLoss classic", args)
-    # re-train with MAE
-    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point03"
-    args.criterion = WeightedMaskedBCELoss()
-    training("train with masked BECLoss like it in paper", args)
+    # train with NMS, Sobel for Gx and Gy
+    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point08_bis"
+    args.criterion = WeightedMSELoss()
+    training("train with NMS, Sobel for Gx and Gy", args, use_nms=True)
+    # train with combination of MAE and MSE
+    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point13"
+    args.criterion = WeightedCombineLoss()
+    training("train with combination of MAE and MSE", args)
 
 if __name__=="__main__":
-    main()()
+    main()
 
