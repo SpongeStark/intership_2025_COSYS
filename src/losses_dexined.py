@@ -103,6 +103,19 @@ class WeightedCombineLoss(WeightedLoss):
     def _loss_fn(self, prediction, target):
         return [torch.pow((pred-target)**2, self.beta).mean() for pred in prediction]
     
+class WeightedLinearCombineLoss(WeightedLoss):
+    def __init__(self, weight=None, alpha=0.99):
+        super().__init__(weight)
+        self.alpha = alpha
+
+    def _loss_fn(self, prediction, target):
+        return [self.alpha * F.l1_loss(pred.squeeze(1), target) + (1-self.alpha) * F.mse_loss(pred.squeeze(1), target) for pred in prediction]
+    
+
+
+
+
+    
 def test(criterion, device='cpu'):
     from dataset import BIPEDv2
     from pathlib import Path
@@ -121,6 +134,7 @@ def test(criterion, device='cpu'):
     outputs = [torch.randn(N, 1, H, W, requires_grad=True, device=device) for i in range(7)]
     loss = criterion(outputs, y)
     print(loss.detach().item())
+
 
 def test_bce(device):
     # loss by class

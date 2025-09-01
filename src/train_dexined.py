@@ -58,7 +58,7 @@ def training(description, args:TrainingArgs, use_nms=False):
     criterion = args.criterion
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     logging = {'metadata': {}, 'train_loss': [], 'val_loss': []}
-    file_stem = "cpt_visibility_04"
+    # file_stem = "cpt_visibility_04"
     logging['metadata'] = {
         "description": description, 
         "num_epoch":epoch, 
@@ -122,17 +122,17 @@ def training(description, args:TrainingArgs, use_nms=False):
         with open(str(log_path), "w") as f:
             json.dump(logging, f)
         print(f"Succeed saving log in {log_path}.")
-    else: # already trained
-        # load model
-        model.load_state_dict(torch.load(f"./checkpoints/{file_stem}.pth", weights_only=True))
-        # load log
-        with open(f"./checkpoints/{file_stem}.json", 'r') as f:
-            logging = json.load(f)
-        # print the loss
-        for e, (train_loss, val_loss) in enumerate(zip(logging['train_loss'], logging['val_loss'])):
-            print("-".join(["-"]*30))
-            print(f"\nIn epoch {e}, the average  training  loss is {train_loss}")
-            print(f"In epoch {e}, the average validation loss is {val_loss}")
+    # else: # already trained
+    #     # load model
+    #     model.load_state_dict(torch.load(f"./checkpoints/{file_stem}.pth", weights_only=True))
+    #     # load log
+    #     with open(f"./checkpoints/{file_stem}.json", 'r') as f:
+    #         logging = json.load(f)
+    #     # print the loss
+    #     for e, (train_loss, val_loss) in enumerate(zip(logging['train_loss'], logging['val_loss'])):
+    #         print("-".join(["-"]*30))
+    #         print(f"\nIn epoch {e}, the average  training  loss is {train_loss}")
+    #         print(f"In epoch {e}, the average validation loss is {val_loss}")
 
 
 def main():
@@ -159,15 +159,15 @@ def multi_train():
         output_dir=PROJECT_ROOT/"data/checkpoints/torch_point00",
         criterion=WeightedMSELoss()
     )
-    # train with NMS, Sobel for Gx and Gy
-    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point08_bis"
-    args.criterion = WeightedMSELoss()
-    training("train with NMS, Sobel for Gx and Gy", args, use_nms=True)
-    # train with combination of MAE and MSE
-    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point13"
-    args.criterion = WeightedCombineLoss()
-    training("train with combination of MAE and MSE", args)
+    # train with 0.99 MAE + 0.01 MSE
+    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point14"
+    args.criterion = WeightedLinearCombineLoss(alpha=0.99)
+    training("train with a linear combination loss of MSE and MAE, 0.99 MAE + 0.01 MSE", args, use_nms=False)
+    # train with 0.9 MAE + 0.1 MSE
+    args.output_dir = PROJECT_ROOT/"data/checkpoints/torch_point15"
+    args.criterion = WeightedLinearCombineLoss(alpha=0.9)
+    training("try with 0.9 MAE + 0.1 MSE", args)
 
 if __name__=="__main__":
-    main()
+    multi_train()
 
